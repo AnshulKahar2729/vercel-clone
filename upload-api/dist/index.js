@@ -19,8 +19,17 @@ const randomid_1 = require("./utils/randomid");
 const path_1 = __importDefault(require("path"));
 const files_1 = require("./utils/files");
 const aws_1 = require("./utils/aws");
+const redis_1 = require("redis");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
+const redisClient = (0, redis_1.createClient)();
+redisClient.on("error", (err) => console.log("Redis Client Error", err));
+function connectClient() {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield redisClient.connect();
+    });
+}
+connectClient();
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -33,12 +42,13 @@ app.post("/deploy", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.log(__dirname);
         yield (0, simple_git_1.default)().clone(repoUrl, path_1.default.join(__dirname, `output/${id}`));
         const files = yield (0, files_1.getAllFiles)(path_1.default.join(__dirname, `output/${id}`));
-        files.forEach((file) => __awaiter(void 0, void 0, void 0, function* () {
+        files.forEach((file) => {
             const localFilePath = file;
             const fileName = file.slice(__dirname.length + 1);
-            yield (0, aws_1.uploadToS3)(fileName, localFilePath);
-        }));
-        res.json({ msg: "Deploying done!" });
+            (0, aws_1.uploadToS3)(fileName, localFilePath);
+        });
+        redisClient.lPush("build-queue", id);
+        res.json({ msg: "Deploying done!", id: id });
     }
     catch (error) {
         console.log(error);

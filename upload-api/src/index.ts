@@ -5,8 +5,16 @@ import { randomId } from "./utils/randomid";
 import path from "path";
 import { getAllFiles } from "./utils/files";
 import { uploadToS3 } from "./utils/aws";
-import dotenv from 'dotenv';
+import { createClient } from "redis";
+import dotenv from "dotenv";
 dotenv.config();
+
+const redisClient = createClient();
+redisClient.on("error", (err) => console.log("Redis Client Error", err));
+async function connectClient() {
+  await redisClient.connect();
+}
+connectClient();
 
 const app = express();
 app.use(cors());
@@ -26,13 +34,15 @@ app.post("/deploy", async (req, res) => {
       path.join(__dirname, `output/${id}`)
     );
 
-    files.forEach(async (file) => {
+    files.forEach(async(file) => {
       const localFilePath = file;
       const fileName = file.slice(__dirname.length + 1);
       await uploadToS3(fileName, localFilePath);
     });
+    
+    await redisClient.lPush("build-queue", id);
 
-    res.json({ msg: "Deploying done!" , id : id});
+    res.json({ msg: "Deploying done!", id: id });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: `Error in deployment : ${error}` });

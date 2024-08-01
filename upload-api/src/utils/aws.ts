@@ -2,7 +2,6 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 
 
-
 export async function uploadToS3(fileName: string, localFilePath: string) {
   try {
     console.log("before uploading to S3")
